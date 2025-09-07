@@ -1,0 +1,258 @@
+import os
+import sys
+import time
+import csv
+import requests
+from io import BytesIO
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+import tkinter as tk
+from tkinter import messagebox
+from PIL import Image, ImageTk
+
+# URL of the screenshot page
+SCREENSHOTS_URL = input("Enter the link to the Steam profile screenshots (example: https://steamcommunity.com/profiles/76561198382122884/screenshots/): ")
+
+# --- Chrome setup to mute logs ---
+chrome_options = Options()
+chrome_options.add_argument("--log-level=3")
+chrome_options.add_argument("--disable-logging")
+chrome_options.add_argument("--silent")
+
+# --- Launch Chrome with STDERR redirected ---
+with open(os.devnull, "w") as fnull:
+    sys.stderr = fnull
+    driver = webdriver.Chrome(options=chrome_options)
+
+# Restore stderr to avoid GUI crashes
+sys.stderr = sys.__stderr__
+
+driver.get(SCREENSHOTS_URL)
+input("Log in to the opened browser, then press ENTER here to continue...")
+
+# --- Infinite scroll to load all screenshots ---
+print("⬇️ Scrolling the page to load all screenshots...")
+last_height = driver.execute_script("return document.body.scrollHeight")
+while True:
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(2)  # let it load
+    new_height = driver.execute_script("return document.body.scrollHeight")
+    if new_height == last_height:
+        break
+    last_height = new_height
+
+print("✅ All screenshots loaded.")
+
+# --- Get all detail links ---
+links = driver.find_elements(By.CSS_SELECTOR, "a.profile_media_item")
+screenshot_links = [(a.get_attribute("data-publishedfileid"), a.get_attribute("href")) for a in links]
+
+print(f"🔗 {len(screenshot_links)} screenshots found.")
+
+results = []
+
+# --- Subscription check + image extraction ---
+for screenshot_id, detail_url in screenshot_links:
+    print(f"\n➡️ Opening screenshot {screenshot_id}...")
+    try:
+        driver.get(detail_url)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.commentthread_subscribe_ctn"))
+        )
+
+        # Check subscription
+        subscribe_box = driver.find_element(By.CSS_SELECTOR, "div.commentthread_subscribe_ctn")
+        subscribed = "checked" in subscribe_box.get_attribute("class")
+        status = "✅ Subscribed" if subscribed else "❌ Not subscribed"
+
+        # Extract image URL
+        try:
+            img_elem = driver.find_element(By.CSS_SELECTOR, "img#ActualMedia")
+            img_url = img_elem.get_attribute("src")
+        except:
+            img_url = None
+
+        print(f"{status} - {detail_url}")
+
+        results.append({
+            "screenshot_id": screenshot_id,
+            "link": detail_url,
+            "status": status,
+            "img_url": img_url
+        })
+    except Exception as e:
+        print(f"⚠️ Error on {screenshot_id}: {e}")
+
+# --- Save results to CSV ---
+with open("steam_screenshots_subscribe_status.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.DictWriter(f, fieldnames=["screenshot_id", "link", "status", "img_url"])
+    writer.writeheader()
+    writer.writerows(results)
+
+print("\n✅ Check completed. Results saved in steam_screenshots_subscribe_status.csv")
+print("📷 Opening GUI with screenshots, please wait...")
+
+# --- Interactive GUI ---
+class ScreenshotGUI:
+    def __init__(self, master, results, driver):
+        self.master = master
+        self.results = results
+        self.driver = driver
+        self.selected = set()
+
+        self.canvas = tk.Canvas(master)
+        self.frame = tk.Frame(self.canvas)
+        self.scrollbar = tk.Scrollbar(master, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.create_window((0, 0), window=self.frame, anchor='nw')
+        self.frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+
+        self.img_labels = []
+
+        self.load_images()
+        self.create_buttons()
+
+    def load_images(self):
+        for idx, res in enumerate(self.results):
+            try:
+                if not res["img_url"]:
+                    continue
+                response = requests.get(res["img_url"])
+                img = Image.open(BytesIO(response.content))
+                img.thumbnail((150, 150))
+                img_tk = ImageTk.PhotoImage(img)
+
+                lbl = tk.Label(self.frame, image=img_tk, borderwidth=2, relief="solid",
+                               highlightthickness=4, highlightbackground="white")  # initial fixed white border
+                lbl.image = img_tk
+                lbl.grid(row=idx//5, column=idx%5, padx=5, pady=5)
+                lbl.bind("<Button-1>", self.make_toggle_callback(idx))
+                
+                # Status icon
+                icon = "✅" if "Subscribed" in res["status"] else "❌"
+                tk.Label(self.frame, text=icon).grid(row=idx//5, column=idx%5, sticky="ne")
+                self.img_labels.append(lbl)
+            except Exception as e:
+                print(f"⚠️ Error loading image {res['img_url']}: {e}")
+
+    def toggle_selection(self, idx):
+        lbl = self.img_labels[idx]
+        if idx in self.selected:
+            # Deselect → white border
+            lbl.config(highlightbackground="white")
+            self.selected.remove(idx)
+        else:
+            # Select → yellow border
+            lbl.config(highlightbackground="yellow")
+            self.selected.add(idx)
+        self.update_counter()
+        self.update_action_buttons()
+
+    def select_all(self):
+        if len(self.selected) == len(self.img_labels):
+            # All selected → deselect all
+            for lbl in self.img_labels:
+                lbl.config(highlightbackground="white")  # color only, fixed thickness
+            self.selected.clear()
+        else:
+            # Select all
+            for lbl in self.img_labels:
+                lbl.config(highlightbackground="yellow")  # color only, fixed thickness
+            self.selected = set(range(len(self.img_labels)))
+        self.update_counter()
+        self.update_action_buttons()
+            
+    def update_counter(self):
+        self.counter_label.config(text=f"Selected: {len(self.selected)}")
+        
+    def update_action_buttons(self):
+        # Enable buttons if there is at least 1 selection
+        state = "normal" if len(self.selected) > 0 else "disabled"
+        self.btn_subscribe.config(state=state)
+        self.btn_unsubscribe.config(state=state)
+        
+    def make_toggle_callback(self, idx):
+        return lambda e: self.toggle_selection(idx)
+
+    def create_buttons(self):
+        btn_frame = tk.Frame(self.master)
+        btn_frame.pack(side="bottom", fill="x", pady=5)
+
+        # Counter on the left
+        self.counter_label = tk.Label(btn_frame, text="Selected: 0")
+        self.counter_label.pack(side="left", padx=10)
+
+        # Remove the "Select" button
+        tk.Button(btn_frame, text="Select all", command=self.select_all).pack(side="left", padx=5)
+
+        self.btn_subscribe = tk.Button(btn_frame, text="Subscribe", command=lambda: self.confirm_action("subscribe"), state="disabled")
+        self.btn_subscribe.pack(side="left", padx=5)
+
+        self.btn_unsubscribe = tk.Button(btn_frame, text="Unsubscribe", command=lambda: self.confirm_action("unsubscribe"), state="disabled")
+        self.btn_unsubscribe.pack(side="left", padx=5)
+
+    def confirm_action(self, action_type):
+        action_text = "Subscribe" if action_type=="subscribe" else "Unsubscribe"
+        if messagebox.askyesno("Confirm", f"Are you sure you want to {action_text} from the comment section of the selected images?"):
+            self.perform_action(action_type)
+
+    def perform_action(self, action_type):
+        for idx in self.selected:
+            res = self.results[idx]
+            try:
+                self.driver.get(res["link"])
+                
+                # Wait for the container to be present
+                subscribe_container = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.commentthread_subscribe_ctn"))
+                )
+                
+                subscribed = "checked" in subscribe_container.get_attribute("class")
+                
+                if action_type == "subscribe":
+                    if not subscribed:
+                        # Click to subscribe
+                        subscribe_button = subscribe_container.find_element(By.CSS_SELECTOR, "span.commentthread_subscribe_checkbox")
+                        self.driver.execute_script("arguments[0].click();", subscribe_button)
+                        time.sleep(1)
+                        self.results[idx]["status"] = "✅ Subscribed"
+                        print(f"{res['screenshot_id']}: ✅ Successfully subscribed")
+                    else:
+                        # Already subscribed
+                        print(f"{res['screenshot_id']}: ⏩ Already subscribed, skipping")
+                        
+                elif action_type == "unsubscribe":
+                    if subscribed:
+                        # Click to unsubscribe
+                        subscribe_button = subscribe_container.find_element(By.CSS_SELECTOR, "span.commentthread_subscribe_checkbox")
+                        self.driver.execute_script("arguments[0].click();", subscribe_button)
+                        time.sleep(1)
+                        self.results[idx]["status"] = "❌ Not subscribed"
+                        print(f"{res['screenshot_id']}: ✅ Successfully unsubscribed")
+                    else:
+                        # Already unsubscribed
+                        print(f"{res['screenshot_id']}: ⏩ Already unsubscribed, skipping")
+
+                # Update icon in the GUI
+                icon = "✅" if "Subscribed" in self.results[idx]["status"] else "❌"
+                tk.Label(self.frame, text=icon).grid(row=idx//5, column=idx%5, sticky="ne")
+
+            except Exception as e:
+                print(f"{res['screenshot_id']}: ⚠️ Error - {e}")
+
+        messagebox.showinfo("Done", f"Action {action_type} completed!")
+
+# Launching GUI
+root = tk.Tk()
+root.title("Steam screenshot subscription management")
+app = ScreenshotGUI(root, results, driver)
+root.mainloop()
+
+# Close browser after GUI is closed
+driver.quit()

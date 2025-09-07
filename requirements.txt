@@ -1,0 +1,7 @@
+## Requirements
+
+- Python 3.8+
+- Google Chrome browser installed
+- Python packages:
+
+pip install selenium pillow requests
