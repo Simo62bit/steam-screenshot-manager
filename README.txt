@@ -1,20 +1,36 @@
 # Steam Screenshot Subscription Manager
 
-A Python script that helps you view Steam profile screenshots, check your subscription status on each screenshot's comment section, and subscribe/unsubscribe directly from a GUI interface.
+A Python script with a GUI that lets you view Steam profile screenshots, check subscription status for each screenshot’s comment section, manage visibility, and subscribe/unsubscribe or delete screenshots directly.
 
 ---
 
 ## Features
 
-- Automatically scrolls through a Steam profile’s screenshots to load all items.
-- Checks subscription status for each screenshot's comment section.
-- Saves results in a CSV file (steam_screenshots_subscribe_status.csv) with:
-  - Screenshot ID
-  - Screenshot link
-  - Subscription status
-  - Image URL
-- Interactive GUI to view screenshots and manage subscriptions.
-- Select individual or all screenshots for batch subscribe/unsubscribe actions.
+- Automatic Screenshot Loading: Scrolls through a Steam profile’s screenshots to load all items.
+- Subscription Status Check: Determines subscription status for the comment section of each screenshot.
+- CSV Export: Saves all results in steam_screenshots_subscribe_status.csv with the following fields:
+	Screenshot ID
+	Screenshot link
+	Subscription status
+	Image URL
+	Visibility
+- Interactive GUI:
+	View thumbnails of all screenshots.
+	Highlight selected screenshots with a red border.
+	Select individual or all screenshots for batch operations.
+- Batch Subscription Management:
+	Subscribe or unsubscribe to comment sections of selected screenshots.
+	Updates the GUI icon to show current subscription status.
+- Visibility Management:
+	Change the visibility of selected screenshots (Public, Friends-only, Hidden, Unlisted) directly from the GUI.
+	Color-coded labels for quick identification:
+		Public → Light green
+		Friends-only → Light yellow
+		Hidden → Light red
+		Unlisted → Light grey
+- Screenshot Deletion: Delete selected screenshots permanently with confirmation prompts.
+- Error Handling: Gracefully handles issues with loading images, changing visibility, or performing subscription actions.
+- Cross-Platform: Works with Chrome via Selenium and standard Python GUI libraries (Tkinter + PIL).
 
 ---
 
@@ -40,18 +56,25 @@ https://steamcommunity.com/profiles/76561198382122884/screenshots/
 
 3. Log in to Steam in the Chrome browser that opens, then press ENTER in the terminal.
 
-4. The script will scroll through the page to load all screenshots and check their subscription status.
+4. The script will scroll through the page to load all screenshots, check their subscription status, and retrieve visibility information.
 
 5. Results will be saved in steam_screenshots_subscribe_status.csv.
 
-6. A GUI window will open, displaying all screenshots with subscription status icons:
+6. A GUI window will open, displaying all screenshots with the following indicators:
    - ✅ Subscribed
    - ❌ Not subscribed
+   - Color-coded visibility labels:
+		Light green → Public
+		Light yellow → Friends-only
+		Light red → Hidden
+		Light grey → Unlisted
 
-7. You can:
+7. GUI interactions:
    - Click a screenshot to select/deselect it.
-   - Use the Select all button to select or deselect all.
-   - Click Subscribe or Unsubscribe to perform the action on selected screenshots.
+   - Use the Select all button to select or deselect all screenshots.
+   - Use Subscribe or Unsubscribe to perform the action on selected screenshots.
+   - Change visibility for selected screenshots using the dropdown menu and Change Visibility button.
+   - Permanently delete selected screenshots using the Delete button (with confirmation prompt).
 
 8. Close the GUI when finished—the Chrome browser will also close automatically.
 
@@ -59,9 +82,10 @@ https://steamcommunity.com/profiles/76561198382122884/screenshots/
 
 ## Notes
 
-- Infinite scrolling may take a few seconds depending on the number of screenshots.
+- Infinite scrolling may take several seconds depending on the number of screenshots.
 - The GUI uses Tkinter and Pillow for image display.
-- Actions (subscribe/unsubscribe) interact with Steam directly—use responsibly to avoid triggering Steam limits.
+- Actions (subscribe/unsubscribe, visibility changes, deletion) interact directly with Steam—use responsibly to avoid triggering Steam limits.
+- Deletion changes are irreversible. double-check selections before confirming.
 
 ---
 
@@ -69,9 +93,9 @@ https://steamcommunity.com/profiles/76561198382122884/screenshots/
 
 After running the script, a CSV file steam_screenshots_subscribe_status.csv will be generated with the following columns:
 
-| screenshot_id | link | status | img_url |
-|---------------|------|--------|---------|
-| 1234567890    | https://steam... | ✅ Subscribed | https://steamcdn... |
+| screenshot\_id | link                              | status       | img\_url                                | visibility |
+| -------------- | --------------------------------- | ------------ | --------------------------------------- | ---------- |
+| 1234567890     | [https://steam](https://steam)... | ✅ Subscribed | [https://steamcdn](https://steamcdn)... | Public     |
 
 ---
 
