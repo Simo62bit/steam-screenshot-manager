@@ -67,6 +67,7 @@ for screenshot_id, detail_url in screenshot_links:
     print(f"\n➡️ Opening screenshot {screenshot_id}...")
     try:
         driver.get(detail_url)
+        time.sleep(1.5)  # Delay to avoid rate limiting
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.commentthread_subscribe_ctn"))
         )
@@ -82,6 +83,8 @@ for screenshot_id, detail_url in screenshot_links:
             img_url = img_elem.get_attribute("src")
         except:
             img_url = None
+        
+        time.sleep(0.5)  # Small delay between processing screenshots
 
         # Extract visibility
         try:
@@ -122,6 +125,7 @@ for screenshot_id, detail_url in screenshot_links:
 
     except Exception as e:
         print(f"⚠️ Error on {screenshot_id}: {e}")
+        time.sleep(2)  # Delay after errors to avoid rate limiting
 
 # Save results to CSV after all screenshots are processed
 with open("steam_screenshots_subscribe_status.csv", "w", newline="", encoding="utf-8") as f:
@@ -158,6 +162,7 @@ class ScreenshotGUI:
             try:
                 if not res["img_url"]:
                     continue
+                time.sleep(0.3)  # Delay between image downloads
                 response = requests.get(res["img_url"])
                 img = Image.open(BytesIO(response.content))
                 img.thumbnail((150, 150))
@@ -281,6 +286,7 @@ class ScreenshotGUI:
             res = self.results[idx]
             try:
                 self.driver.get(res["link"])
+                time.sleep(1.0)  # Delay before subscribe operations
                 
                 subscribe_container = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div.commentthread_subscribe_ctn"))
@@ -292,7 +298,7 @@ class ScreenshotGUI:
                     if not subscribed:
                         subscribe_button = subscribe_container.find_element(By.CSS_SELECTOR, "span.commentthread_subscribe_checkbox")
                         self.driver.execute_script("arguments[0].click();", subscribe_button)
-                        time.sleep(1)
+                        time.sleep(1.5)  # Longer delay after subscribe actions
                         self.results[idx]["status"] = "✅ Subscribed"
                         print(f"{res['screenshot_id']}: ✅ Successfully subscribed")
                     else:
@@ -302,7 +308,7 @@ class ScreenshotGUI:
                     if subscribed:
                         subscribe_button = subscribe_container.find_element(By.CSS_SELECTOR, "span.commentthread_subscribe_checkbox")
                         self.driver.execute_script("arguments[0].click();", subscribe_button)
-                        time.sleep(1)
+                        time.sleep(1.5)  # Longer delay after unsubscribe actions
                         self.results[idx]["status"] = "❌ Not subscribed"
                         print(f"{res['screenshot_id']}: ✅ Successfully unsubscribed")
                     else:
@@ -335,6 +341,7 @@ class ScreenshotGUI:
             res = self.results[idx]
             try:
                 self.driver.get(res["link"])
+                time.sleep(1.0)  # Delay before visibility operations
 
                 visibility_container = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div.visibilityselectcontainer"))
@@ -342,12 +349,12 @@ class ScreenshotGUI:
 
                 menu_button = visibility_container.find_element(By.ID, "visibilityselect")
                 self.driver.execute_script("arguments[0].click();", menu_button)
-                time.sleep(1)
+                time.sleep(1.5)
 
                 option_id = visibility_map.get(vis_type)
                 option_elem = self.driver.find_element(By.ID, option_id)
                 self.driver.execute_script("arguments[0].click();", option_elem)
-                time.sleep(1)
+                time.sleep(1.5)  # Longer delay after visibility changes
 
                 print(f"{res['screenshot_id']}: ✅ Visibility changed to {vis_type}")
                 self.results[idx]["visibility"] = vis_type
@@ -374,20 +381,21 @@ class ScreenshotGUI:
             res = self.results[idx]
             try:
                 self.driver.get(res["link"])
+                time.sleep(1.0)  # Delay before delete operations
 
                 # Find the Delete button
                 delete_btn = WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Delete')]"))
                 )
                 self.driver.execute_script("arguments[0].click();", delete_btn)
-                time.sleep(1)
+                time.sleep(1.5)
 
                 # Wait for the confirmation modal and click OK
                 ok_btn = WebDriverWait(self.driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, "//div[contains(@class,'btn_green_steamui')]/span[text()='OK']"))
                 )
                 self.driver.execute_script("arguments[0].click();", ok_btn)
-                time.sleep(1)
+                time.sleep(2.0)  # Longer delay after delete operations
 
                 print(f"{res['screenshot_id']}: ✅ Successfully deleted")
 
