@@ -74,7 +74,7 @@ echo %YELLOW%=======================================%RESET%
 echo %YELLOW%Installing required Python packages...%RESET%
 echo %YELLOW%=======================================%RESET%
 
-pip install selenium pillow requests
+python3 -m pip install selenium pillow requests
 if %errorlevel% neq 0 (
     echo %RED%[ERROR]%RESET% Package installation failed.
     set "error_flag=1"
