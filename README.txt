@@ -40,7 +40,7 @@ A Python script with a GUI that lets you view Steam profile screenshots, check s
 - Google Chrome browser installed
 - Python packages:
 
-pip install selenium pillow requests
+python3 -m pip install selenium pillow requests
 
 ---
 
